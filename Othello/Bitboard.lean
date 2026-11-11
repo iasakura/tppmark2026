@@ -207,7 +207,8 @@ theorem chain_iff {src opp : UInt64} {δ : Int} :
         | succ j =>
           right
           refine ⟨j + 1, by omega, by omega, ?_, ?_⟩
-          · have e : i - ((j + 1 + 1 : Nat) : Int) * δ = i - δ - ((j + 1 : Nat) : Int) * δ := by grind
+          · have e : i - ((j + 1 + 1 : Nat) : Int) * δ
+                = i - δ - ((j + 1 : Nat) : Int) * δ := by grind
             rw [e] at hs; exact hs
           · intro j' hj'
             have := hall (j' + 1) (by omega)

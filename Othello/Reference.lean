@@ -167,7 +167,8 @@ def replay (n : Nat) : Nat → List (Square × Option Color) → Color → List 
   | fuel + 1, tbl, c, s :: ms =>
     let b := ofTable tbl
     if Legal n b c s then replay n fuel (tabPlay n b c s) c.opponent ms
-    else if moves n b c = [] ∧ moves n b c.opponent ≠ [] then replay n fuel tbl c.opponent (s :: ms)
+    else if moves n b c = [] ∧ moves n b c.opponent ≠ [] then
+      replay n fuel tbl c.opponent (s :: ms)
     else none
 
 theorem replay_sound :

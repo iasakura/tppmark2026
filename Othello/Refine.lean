@@ -569,7 +569,8 @@ theorem and_sqMask_ne_zero (hn : n ≤ 6) {s : Square} (hs : OnBoard n s) (x : U
 
 theorem mem_boardMask (hn : n ≤ 6) (i : Int) : Mem (boardMask n) i ↔ Valid n i := by
   have gen : ∀ (l : List Square), (∀ s, s ∈ l → OnBoard n s) → ∀ (a : UInt64),
-      (Mem ((l.map sqMask).foldl (fun a m => a ||| m) a) i ↔ Mem a i ∨ ∃ s, s ∈ l ∧ i = idx s) := by
+      (Mem ((l.map sqMask).foldl (fun a m => a ||| m) a) i ↔
+        Mem a i ∨ ∃ s, s ∈ l ∧ i = idx s) := by
     intro l
     induction l with
     | nil =>

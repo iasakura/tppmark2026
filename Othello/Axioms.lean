@@ -32,7 +32,12 @@ open Othello
 #print axioms exists_optimalResult
 
 -- Problem 3: what is proved
+#print axioms othello8_result_exists
 #print axioms othello8_draw_of_search
 #print axioms perft8
 #print axioms takizawa_line
 #print axioms takizawa_line_tail
+
+-- Games realising the optimal results
+#print axioms line4_finished
+#print axioms line6_finished

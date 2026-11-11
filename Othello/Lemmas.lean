@@ -242,7 +242,8 @@ theorem mem_flipsDir_iff {b : Board} {c : Color} {s : Square} {d : Int × Int}
 theorem mem_flips_iff {b : Board} {c : Color} {s : Square}
     (hs : OnBoard n s) (q : Square) :
     q ∈ flips n b c s ↔
-      ∃ d, d ∈ directions ∧ ∃ m, Outflank n b c s d m ∧ ∃ i, 1 ≤ i ∧ i < m ∧ q = far s d i := by
+      ∃ d, d ∈ directions ∧
+        ∃ m, Outflank n b c s d m ∧ ∃ i, 1 ≤ i ∧ i < m ∧ q = far s d i := by
   unfold flips
   simp only [List.mem_flatMap]
   constructor

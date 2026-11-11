@@ -38,6 +38,7 @@ section Rules
 /- The board has `n` columns and `n` rows, both numbered `0, …, n-1`. -/
 variable (n : Nat)
 
+/-- `s` is a square of the `n × n` board. -/
 def OnBoard (s : Square) : Prop :=
   0 ≤ s.1 ∧ s.1 < n ∧ 0 ≤ s.2 ∧ s.2 < n
 
@@ -92,7 +93,8 @@ def play (b : Board) (c : Color) (s : Square) : Board :=
 
 /-- All squares of the board. -/
 def squares : List Square :=
-  (List.range n).flatMap fun (y : Nat) => (List.range n).map fun (x : Nat) => ((x : Int), (y : Int))
+  (List.range n).flatMap fun (y : Nat) =>
+    (List.range n).map fun (x : Nat) => ((x : Int), (y : Int))
 
 /-- The legal moves of `c`. -/
 def moves (b : Board) (c : Color) : List Square :=

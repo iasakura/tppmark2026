@@ -23,4 +23,15 @@ def line4 : List Square :=
 theorem line4_finished : FinishedGame 4 2 line4 3 11 :=
   checkRecord_sound (h := 2) (by decide) (by native_decide)
 
+/-- A complete game of 6 × 6 Othello ending 16–20.  (After the 28th move
+Black has no legal move and passes; the board is full at the end.) -/
+def line6 : List Square :=
+  [(2, 1), (1, 3), (2, 4), (3, 1), (4, 3), (4, 2), (3, 0), (2, 0), (1, 0), (3, 4),
+   (3, 5), (5, 3), (1, 2), (1, 1), (5, 2), (5, 1), (4, 1), (1, 5), (0, 3), (0, 2),
+   (0, 4), (0, 5), (0, 0), (1, 4), (0, 1), (2, 5), (4, 4), (4, 5), (5, 0), (4, 0),
+   (5, 4), (5, 5)]
+
+theorem line6_finished : FinishedGame 6 3 line6 16 20 :=
+  checkRecord_sound (h := 3) (by decide) (by native_decide)
+
 end Othello

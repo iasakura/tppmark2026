@@ -1,4 +1,5 @@
 import Othello.Reference
+import Othello.Determinacy
 
 /-!
 # Problem 3: 8 × 8 Othello
@@ -15,6 +16,8 @@ second and core, and it does not even apply to 8 × 8 boards).
 
 What is proved in this file:
 
+* `othello8_result_exists`: the result of 8 × 8 Othello under optimal play is
+  a well-defined number (Problem 3 says that this number is 0);
 * `othello8_draw_of_search`: the statement is reduced to a finite computation —
   if the reference search of `Othello/Reference.lean` succeeds for both
   players, the draw follows;
@@ -23,8 +26,9 @@ What is proved in this file:
   a standard test of Othello move generators;
 * `takizawa_line`: the optimal line published in [1] is a complete legal game
   of the specification and ends 32–32;
-* `takizawa_line_tail`: the last moves of this line are optimal — from the
-  position after 50 of its moves, the result under optimal play is a draw.
+* `takizawa_line_tail`: the last 14 moves of this line are optimal play —
+  every position the line visits after its 46th move is a draw under optimal
+  play.
 
 The computations of this file are run with `native_decide`.
 -/
@@ -34,6 +38,13 @@ namespace Othello
 /-- **Problem 3 (statement).**  The result of 8 × 8 Othello under optimal play
 is a draw: Black can secure at least a draw, and so can White. -/
 def Othello8Draw : Prop := OptimalResult 8 (initial 4) .black 0
+
+/-- The result of 8 × 8 Othello under optimal play exists and is unique, by
+the general determinacy theorem.  Problem 3 claims that it is 0. -/
+theorem othello8_result_exists :
+    ∃ v, OptimalResult 8 (initial 4) .black v ∧
+      ∀ w, OptimalResult 8 (initial 4) .black w → w = v :=
+  existsUnique_optimalResult _ _
 
 /-- Problem 3 is reduced to a finite computation: two runs of the reference
 search.  (The computation is far too large to be carried out.) -/
@@ -105,11 +116,18 @@ theorem checkTail_sound {k fuel : Nat} (h : checkTail k fuel = true) :
     exact ⟨b, c, hrec, refSecures_sound .black 0 fuel b c hb h.1,
       refSecures_sound .white 0 fuel b c hb h.2⟩
 
-/-- The end of the optimal line of [1] is optimal: in the position reached
-after its first 50 moves (10 squares are empty), the result under optimal
-play is a draw. -/
-theorem takizawa_line_tail :
-    ∃ b c, Record 8 (initial 4) .black (takizawaLine.take 50) b c ∧ OptimalResult 8 b c 0 :=
-  checkTail_sound (k := 50) (fuel := 40) (by native_decide)
+set_option maxHeartbeats 0 in
+/-- The end of the optimal line of [1] is optimal play: every position the
+line visits after its 46th move (from then on at most 14 squares are empty)
+is a draw under optimal play.  In particular, each of the last 14 moves keeps
+the draw. -/
+theorem takizawa_line_tail (k : Nat) (h1 : 46 ≤ k) (h2 : k ≤ 60) :
+    ∃ b c, Record 8 (initial 4) .black (takizawaLine.take k) b c ∧ OptimalResult 8 b c 0 := by
+  have h : (List.range 15).all (fun i => checkTail (46 + i) 40) = true := by native_decide
+  rw [List.all_eq_true] at h
+  have h3 := h (k - 46) (by rw [List.mem_range]; omega)
+  have e : 46 + (k - 46) = k := by omega
+  rw [e] at h3
+  exact checkTail_sound h3
 
 end Othello

@@ -1,4 +1,10 @@
-// Hint generator / simulator for the verified search (untrusted helper).
+// Hint generator for the verified 6x6 search (an untrusted helper).
+//
+// This is an ordinary alpha-beta solver with a transposition table.  It walks
+// the top of the proof tree of "Black secures >= t" / "White secures >= t" and
+// writes down, for every position with at least EH empty squares, which move
+// the prover should try first.  The verified search of Othello/Search.lean
+// uses this only to order its moves; nothing computed here is trusted.
 //
 // Usage: gen N side t EH ORDMIN ttbits out_prefix [simulate(0/1)]
 //   side = B : find hints for "Black secures a margin >= t" (root is an OR node)
@@ -6,8 +12,14 @@
 //   side = P : print a game in which both players play optimally, given that
 //              the value of the initial position is t for Black
 //   EH       : positions with at least EH empty squares get hints
-//   ORDMIN   : the verified search orders moves "fastest first" when empties >= ORDMIN
-// Output: out_prefix.hint (hint string), out_prefix.pos (horizon positions)
+//   ORDMIN   : the verified search orders moves "fastest first" when at least
+//              ORDMIN squares are empty (only used when simulating it)
+//   ttbits   : log2 of the number of transposition table entries (24 bytes each)
+//   simulate : if 1, also run a copy of the verified search (without table)
+//              below the hinted part and report its node count
+// Output: out_prefix.hint (the hint string, turned into Lean by
+//         tools/hints_to_lean.py) and out_prefix.pos (the positions at which
+//         the hints end).
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
