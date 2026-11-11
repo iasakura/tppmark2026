@@ -7,6 +7,9 @@
 #   Problem 1 (4x4): only the three standard axioms are permitted.
 #   Problem 2 (6x6): additionally the three axioms recording the results of
 #                    compiled computations (two searches, one SAT certificate).
+#   Problem 3 (8x8): additionally the axiom takizawa_results (the published
+#                    table of "Othello is Solved") and the two axioms recording
+#                    the searches of the first ten plies.
 set -euo pipefail
 out=$(mktemp -d)
 
@@ -16,6 +19,7 @@ lake env leanchecker Othello.Four
 echo "== export =="
 lake env leanexport Othello.Four -- Othello.white_wins_4x4 Othello.othello_4x4 > "$out/four.ndjson"
 lake env leanexport Othello.Six -- Othello.othello_6x6 > "$out/six.ndjson"
+lake env leanexport Othello.Eight -- Othello.othello_8x8 > "$out/eight.ndjson"
 
 cat > "$out/four.json" <<JSON
 { "export_file_path": "$out/four.ndjson",
@@ -37,10 +41,25 @@ cat > "$out/six.json" <<JSON
   "print_success_message": true }
 JSON
 
+cat > "$out/eight.json" <<JSON
+{ "export_file_path": "$out/eight.ndjson",
+  "permitted_axioms": ["propext", "Classical.choice", "Quot.sound",
+    "Othello.takizawa_results",
+    "Othello.search8_black._native.native_decide.ax_1_1",
+    "Othello.search8_white._native.native_decide.ax_1_1"],
+  "unpermitted_axiom_hard_error": true,
+  "nat_extension": true, "string_extension": true,
+  "pp_declars": ["Othello.othello_8x8", "Othello.takizawa_results"], "pp_to_stdout": true,
+  "print_success_message": true }
+JSON
+
 echo "== nanoda: Problem 1 =="
 nanoda_bin "$out/four.json"
 echo "== nanoda: Problem 2 (modulo the three native-computation axioms) =="
 nanoda_bin "$out/six.json"
+
+echo "== nanoda: Problem 3 (modulo takizawa_results and the two native-computation axioms) =="
+nanoda_bin "$out/eight.json"
 
 if command -v con-leche > /dev/null; then
   echo "== con-leche: Problem 1 =="
