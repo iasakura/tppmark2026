@@ -1,0 +1,7 @@
+name = "othello"
+version = "0.1.0"
+defaultTargets = ["Othello"]
+
+[[lean_lib]]
+name = "Othello"
+precompileModules = true
