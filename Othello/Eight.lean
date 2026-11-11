@@ -11,6 +11,10 @@ import Othello.Eight.Hints
 Solved" have the values that were computed for them.  The axiom is not
 checked by Lean; replaying the computation behind it is out of reach.
 
+The checked part is stated separately, without any axiom about the table:
+`othello_8x8_of_table` says that *if* the table is correct, the game is a
+draw.
+
 What Lean does check is the rest of the argument: starting from the initial
 position, a search of the first ten plies (`search8_black`, `search8_white`)
 shows that
@@ -41,18 +45,24 @@ theorem search8_white :
       (encode 8 (initial 4) .black) (encode 8 (initial 4) .white) .black = true := by
   native_decide
 
-/-- **Problem 3, relative to the axiom `takizawa_results`.**  From the
-standard initial position of 8 × 8 Othello, the game ends in a draw under
-optimal play. -/
-theorem othello_8x8 : Othello8Draw := by
+/-- **What Lean has checked about Problem 3.**  If every row of the published
+table is correct, then 8 × 8 Othello is a draw.  (No axiom about the table is
+used here: its correctness is a hypothesis.) -/
+theorem othello_8x8_of_table (htable : ∀ e, e ∈ takizawaTable → e.Holds) : Othello8Draw := by
   have hinit : decodeBoard 8 (encode 8 (initial 4) .black) (encode 8 (initial 4) .white)
       = initial 4 := decode_encode (by decide) (clean_initial 4 (by decide))
-  have hb := refSearch_sound (n := 8) (by decide) (tableOracle_sound .black) _ _ _ _ _
+  have hb := refSearch_sound (n := 8) (by decide) (tableOracle_sound htable .black) _ _ _ _ _
     search8_black
-  have hw := refSearch_sound (n := 8) (by decide) (tableOracle_sound .white) _ _ _ _ _
+  have hw := refSearch_sound (n := 8) (by decide) (tableOracle_sound htable .white) _ _ _ _ _
     search8_white
   rw [hinit] at hb hw
   exact ⟨hb, hw⟩
+
+/-- **Problem 3, relative to the axiom `takizawa_results`.**  From the
+standard initial position of 8 × 8 Othello, the game ends in a draw under
+optimal play. -/
+theorem othello_8x8 : Othello8Draw :=
+  othello_8x8_of_table takizawa_results
 
 /-! ## A consistency check between the table and the published line -/
 

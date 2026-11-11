@@ -28,10 +28,12 @@ theorem white_wins_4x4 : Secures 4 .white 1 (initial 2) .black
 theorem othello_4x4    : OptimalResult 4 (initial 2) .black (-8)
 -- 問題 2
 theorem othello_6x6    : OptimalResult 6 (initial 3) .black (-4)
--- 問題 3（公理 takizawa_results に依存）
+-- 問題 3
 def Othello8Draw : Prop := OptimalResult 8 (initial 4) .black 0
-axiom takizawa_results : ∀ e, e ∈ takizawaTable → e.Holds   -- [1] の計算結果（2587 局面の評価表）
-theorem othello_8x8    : Othello8Draw
+theorem othello_8x8_of_table :                                  -- Lean が検証した部分
+    (∀ e, e ∈ takizawaTable → e.Holds) → Othello8Draw
+axiom takizawa_results : ∀ e, e ∈ takizawaTable → e.Holds      -- [1] の計算結果（2587 局面の評価表）。未検証
+theorem othello_8x8 : Othello8Draw := othello_8x8_of_table takizawa_results
 ```
 
 **問題 3 は「証明支援系がすべてを検査した証明」ではありません。** 8×8 の引き分けは約 1.5 × 10¹⁸ 局面の
@@ -191,20 +193,21 @@ popcount_eq_cntBits6._native.bv_decide.ax_1_8 :   -- SAT 証明書の検査結�
   `alpha` 以下なら白が `-alpha` 以上を保証できる」という主張です。表では該当する `alpha`・`beta`・予測値がすべて 0 なので
   （`takizawaTable_shapes` で確認）、1639 行が「黒は引き分け以上」、947 行が「白は引き分け以上」、1 行が「ちょうど引き分け」
   という主張になります。符号だけの主張なので、空きマスの数え方の流儀にも依存しません。
-* `Othello/Eight.lean`：`theorem othello_8x8 : Othello8Draw`。初期局面から表の局面までの探索
+* `Othello/Eight.lean`：`othello_8x8_of_table`（**表が正しければ引き分け**。表に関する公理は使わず、表の正しさは仮定）と、
+  それに公理を適用した `othello_8x8 : Othello8Draw`。初期局面から表の局面までの探索
   （`search8_black`：2923 ノード、`search8_white`：10601 ノード）を Lean で実行し、
   「黒は、白がどう打っても表の『0 以上』の局面に持ち込める」「白は、黒がどう打っても表の『0 以下』の局面に持ち込める」
   ことを確認します。表の局面は盤の 8 通りの対称変換を除いた代表なので、照合には
   対称変換でゲームが不変であるという定理（`Othello/Symmetry.lean` の `secures_sym_iff`）を使います。
   2587 行のうち、この 2 本の戦略木が実際に使うのは 2257 行です。
 
-`othello_8x8` の依存公理は次の通りです。
+依存公理は次の通りです。
 
 ```
-'Othello.othello_8x8' depends on axioms: [propext, Classical.choice, Quot.sound,
-  takizawa_results,                              -- [1] の計算結果（Lean は未検証）
+'Othello.othello_8x8_of_table' depends on axioms: [propext, Classical.choice, Quot.sound,
   search8_black._native.native_decide.ax_1_1,    -- 最初の 10 手の探索（コンパイルされたコードで実行）
   search8_white._native.native_decide.ax_1_1]
+'Othello.othello_8x8' depends on axioms: 上記 + takizawa_results   -- [1] の計算結果（Lean は未検証）
 ```
 
 **`takizawa_results` は Lean が検査していない主張です。** 2587 局面の評価が正しいことは [1] の計算に依拠しており、

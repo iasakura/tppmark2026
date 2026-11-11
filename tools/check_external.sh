@@ -19,7 +19,7 @@ lake env leanchecker Othello.Four
 echo "== export =="
 lake env leanexport Othello.Four -- Othello.white_wins_4x4 Othello.othello_4x4 > "$out/four.ndjson"
 lake env leanexport Othello.Six -- Othello.othello_6x6 > "$out/six.ndjson"
-lake env leanexport Othello.Eight -- Othello.othello_8x8 > "$out/eight.ndjson"
+lake env leanexport Othello.Eight -- Othello.othello_8x8 Othello.othello_8x8_of_table > "$out/eight.ndjson"
 
 cat > "$out/four.json" <<JSON
 { "export_file_path": "$out/four.ndjson",
@@ -49,7 +49,8 @@ cat > "$out/eight.json" <<JSON
     "Othello.search8_white._native.native_decide.ax_1_1"],
   "unpermitted_axiom_hard_error": true,
   "nat_extension": true, "string_extension": true,
-  "pp_declars": ["Othello.othello_8x8", "Othello.takizawa_results"], "pp_to_stdout": true,
+  "pp_declars": ["Othello.othello_8x8_of_table", "Othello.othello_8x8", "Othello.takizawa_results"],
+  "pp_to_stdout": true,
   "print_success_message": true }
 JSON
 

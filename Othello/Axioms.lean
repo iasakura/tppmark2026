@@ -35,6 +35,9 @@ open Othello
 #print axioms exists_optimalResult
 #print axioms secures_sym_iff
 
+-- Problem 3: "if the published table is correct, 8 × 8 Othello is a draw"
+#print axioms othello_8x8_of_table
+
 -- Problem 3, relative to the published computation (axiom `takizawa_results`)
 #print axioms othello_8x8
 

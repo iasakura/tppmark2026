@@ -67,14 +67,6 @@ def Entry.Holds (e : Entry) : Prop :=
   else
     Secures 8 .white (-e.alpha) (boardOfString e.board) .black
 
-/-- **Axiom: the computational result of H. Takizawa, "Othello is Solved"
-(arXiv:2310.19387).**  Every row of the published table of 2587 positions
-with 50 empty squares is correct.
-
-This statement has *not* been checked by Lean.  It records the outcome of a
-computation of about 1.5 × 10¹⁸ search nodes carried out for [1]. -/
-axiom takizawa_results : ∀ e, e ∈ takizawaTable → e.Holds
-
 /-! ## The table, checked for shape -/
 
 theorem takizawaTable_length : takizawaTable.length = 2587 := by decide +kernel
@@ -192,9 +184,10 @@ def tableOracle (p : Color) (bl wh : Nat) (c : Color) : Bool :=
          | .black => x.2.2.1
          | .white => x.2.2.2)
 
-/-- Given the axiom, the oracle only accepts positions in which `p` can
-secure a draw. -/
-theorem tableOracle_sound (p : Color) (bl wh : Nat) (c : Color)
+/-- If the table is correct, the oracle only accepts positions in which `p`
+can secure a draw. -/
+theorem tableOracle_sound (htable : ∀ e, e ∈ takizawaTable → e.Holds)
+    (p : Color) (bl wh : Nat) (c : Color)
     (h : tableOracle p bl wh c = true) : Secures 8 p 0 (decodeBoard 8 bl wh) c := by
   unfold tableOracle at h
   simp only [Bool.and_eq_true, decide_eq_true_eq, List.any_eq_true, beq_iff_eq] at h
@@ -213,8 +206,18 @@ theorem tableOracle_sound (p : Color) (bl wh : Nat) (c : Color)
   rw [hbl, hwh, h2] at h1
   have hsup' : e.supports p = true := by
     cases p <;> exact hsup
-  have h3 := Entry.secures_of_supports (takizawa_results e he) hsup'
+  have h3 := Entry.secures_of_supports (htable e he) hsup'
   rw [← h1] at h3
   exact (secures_sym8 k).1 h3
+
+/-! ## The axiom -/
+
+/-- **Axiom: the computational result of H. Takizawa, "Othello is Solved"
+(arXiv:2310.19387).**  Every row of the published table of 2587 positions
+with 50 empty squares is correct.
+
+This statement has *not* been checked by Lean.  It records the outcome of a
+computation of about 1.5 × 10¹⁸ search nodes carried out for [1]. -/
+axiom takizawa_results : ∀ e, e ∈ takizawaTable → e.Holds
 
 end Othello
