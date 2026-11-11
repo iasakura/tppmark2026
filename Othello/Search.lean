@@ -17,9 +17,12 @@ tried, and the soundness theorem holds whatever they are.
 namespace Othello
 
 /-- Hints for the search: a list of moves (bit numbers) to try first in the
-current position, each with hints for the position after that move. -/
+current position, each with hints for the position after that move.
+`par` is like `node` but additionally asks for the listed moves to be examined
+in parallel (this is only done at "and" nodes). -/
 inductive Hint where
   | node (children : List (UInt64 × Hint))
+  | par (children : List (UInt64 × Hint))
 
 namespace Hint
 
@@ -72,9 +75,21 @@ in order, then the remaining bits. -/
     if mv &&& m = 0 then allCand k cs mv
     else k i h && allCand k cs (mv ^^^ m)
 
+/-- Like `allCand`, but the candidates are examined in parallel tasks
+(collected in `ts`), whose results are awaited at the end. -/
+@[specialize] def allCandPar (k : UInt64 → Hint → Bool) :
+    List (UInt64 × Hint) → UInt64 → List (Task Bool) → Bool
+  | [], mv, ts => ts.all Task.get && allBit (fun i => k i Hint.none) 64 mv
+  | (i, h) :: cs, mv, ts =>
+    let m := (1 : UInt64) <<< i
+    if mv &&& m = 0 then allCandPar k cs mv ts
+    else allCandPar k cs (mv ^^^ m) (Task.spawn (fun _ => k i h) :: ts)
+
 /-! ## Move ordering (not trusted: any order is sound) -/
 
-/-- Number of set bits (used only by the ordering heuristic). -/
+/-- Number of set bits, by the usual bit-parallel method.  It is used by the
+ordering heuristic and, when the search is run with `fast := true`, to count
+the discs at the end of the game. -/
 def popcount (x : UInt64) : UInt64 :=
   let m1 : UInt64 := 0x5555555555555555
   let m2 : UInt64 := 0x3333333333333333
@@ -111,48 +126,64 @@ otherwise, when at least `ordMin` squares are empty, all moves sorted
 def order (ordMin : UInt64) (h : Hint) (mask me opp mv : UInt64) : List (UInt64 × Hint) :=
   match h with
   | .node (c :: cs) => c :: cs
-  | .node [] =>
+  | .par (c :: cs) => c :: cs
+  | _ =>
     if ordMin ≤ popcount (mask ^^^ (me ||| opp)) then
       (sortMoves mask me opp 64 mv []).map fun p => (p.2, Hint.none)
     else []
+
+/-- The margin of a finished game for the player to move: with `fast := false`
+by `margin` (a loop over the squares, convenient for kernel evaluation), with
+`fast := true` by `popcount`. -/
+@[inline] def finalMargin (fast : Bool) (ms : List UInt64) (me opp : UInt64) : Int :=
+  if fast then ((popcount me).toNat : Int) - ((popcount opp).toNat : Int)
+  else margin ms me opp
 
 /-! ## The search -/
 
 mutual
 
-/-- `secMe ms mask ordMin t fuel h me opp = true` only if the player to move
-can secure a margin of at least `t`. -/
-def secMe (ms : List UInt64) (mask ordMin : UInt64) (t : Int) :
+/-- `secMe fast ms mask ordMin t fuel h me opp = true` only if the player to
+move can secure a margin of at least `t`. -/
+def secMe (fast : Bool) (ms : List UInt64) (mask ordMin : UInt64) (t : Int) :
     Nat → Hint → UInt64 → UInt64 → Bool
   | 0, _, _, _ => false
   | fuel + 1, h, me, opp =>
     let mv := mobility mask me opp
     if mv = 0 then
-      if mobility mask opp me = 0 then decide (t ≤ margin ms me opp)
-      else secOp ms mask ordMin t fuel h opp me
+      if mobility mask opp me = 0 then decide (t ≤ finalMargin fast ms me opp)
+      else secOp fast ms mask ordMin t fuel h opp me
     else
       anyCand (fun i h' =>
           let m := (1 : UInt64) <<< i
           let f := flips me opp m
-          secOp ms mask ordMin t fuel h' (opp ^^^ f) (me ||| m ||| f))
+          secOp fast ms mask ordMin t fuel h' (opp ^^^ f) (me ||| m ||| f))
         (order ordMin h mask me opp mv) mv
 
-/-- `secOp ms mask ordMin t fuel h me opp = true` only if the player who is
-*not* to move can secure a margin of at least `t`. -/
-def secOp (ms : List UInt64) (mask ordMin : UInt64) (t : Int) :
+/-- `secOp fast ms mask ordMin t fuel h me opp = true` only if the player who
+is *not* to move can secure a margin of at least `t`. -/
+def secOp (fast : Bool) (ms : List UInt64) (mask ordMin : UInt64) (t : Int) :
     Nat → Hint → UInt64 → UInt64 → Bool
   | 0, _, _, _ => false
   | fuel + 1, h, me, opp =>
     let mv := mobility mask me opp
     if mv = 0 then
-      if mobility mask opp me = 0 then decide (t ≤ margin ms opp me)
-      else secMe ms mask ordMin t fuel h opp me
+      if mobility mask opp me = 0 then decide (t ≤ finalMargin fast ms opp me)
+      else secMe fast ms mask ordMin t fuel h opp me
     else
-      allCand (fun i h' =>
-          let m := (1 : UInt64) <<< i
-          let f := flips me opp m
-          secMe ms mask ordMin t fuel h' (opp ^^^ f) (me ||| m ||| f))
-        (order ordMin h mask me opp mv) mv
+      match h with
+      | .par cs =>
+        allCandPar (fun i h' =>
+            let m := (1 : UInt64) <<< i
+            let f := flips me opp m
+            secMe fast ms mask ordMin t fuel h' (opp ^^^ f) (me ||| m ||| f))
+          cs mv []
+      | _ =>
+        allCand (fun i h' =>
+            let m := (1 : UInt64) <<< i
+            let f := flips me opp m
+            secMe fast ms mask ordMin t fuel h' (opp ^^^ f) (me ||| m ||| f))
+          (order ordMin h mask me opp mv) mv
 
 end
 
@@ -275,6 +306,37 @@ theorem allCand_sound {k : UInt64 → Hint → Bool} :
       · exact ⟨i, hh, hji, h.1⟩
       · exact ih _ h.2 j (mem_xor_bit_of_ne hj hji)
 
+theorem allCandPar_sound {k : UInt64 → Hint → Bool} :
+    ∀ (cs : List (UInt64 × Hint)) (mv : UInt64) (ts : List (Task Bool)),
+      BB.allCandPar k cs mv ts = true →
+      ∀ j, Mem mv j → ∃ (i : UInt64) (h : Hint), j = bitNo i ∧ k i h = true := by
+  have key : ∀ (cs : List (UInt64 × Hint)) (mv : UInt64) (ts : List (Task Bool)),
+      BB.allCandPar k cs mv ts = true →
+      ts.all Task.get = true ∧
+        ∀ j, Mem mv j → ∃ (i : UInt64) (h : Hint), j = bitNo i ∧ k i h = true := by
+    intro cs
+    induction cs with
+    | nil =>
+      intro mv ts h
+      simp only [BB.allCandPar, Bool.and_eq_true] at h
+      refine ⟨h.1, fun j hj => ?_⟩
+      obtain ⟨i, hi, hk⟩ := allBit_sound _ _ h.2 j hj
+      exact ⟨i, Hint.none, hi, hk⟩
+    | cons c cs ih =>
+      intro mv ts h
+      obtain ⟨i, hh⟩ := c
+      simp only [BB.allCandPar] at h
+      split at h
+      · exact ih _ _ h
+      · obtain ⟨h1, h2⟩ := ih _ _ h
+        rw [List.all_cons, Bool.and_eq_true] at h1
+        refine ⟨h1.2, fun j hj => ?_⟩
+        by_cases hji : j = bitNo i
+        · exact ⟨i, hh, hji, h1.1⟩
+        · exact h2 j (mem_xor_bit_of_ne hj hji)
+  intro cs mv ts h
+  exact (key cs mv ts h).2
+
 /-! ## Soundness of the search -/
 
 variable {n : Nat}
@@ -286,16 +348,30 @@ the board `b` with `c` to move, then
 * `secOp … me opp = true` implies that the opponent of `c` can secure a margin
   of at least `t`.
 
-This holds for all hints and whatever the ordering heuristic does. -/
+This holds for all hints and whatever the ordering heuristic does.  If the
+search is run with `fast := true`, the disc count by `popcount` must be known
+to be correct on this board size (hypothesis `hfast`). -/
 theorem sec_sound (hn : n ≤ 6) {ms : List UInt64} (hms : ms = sqMasks n)
     {mask : UInt64} (hmask : ∀ i, Mem mask i ↔ Valid n i)
+    (fast : Bool)
+    (hfast : fast = true → ∀ (me opp : UInt64) (b : Board) (c : Color),
+      Repr n me opp b c →
+      ((BB.popcount me).toNat : Int) - ((BB.popcount opp).toNat : Int) = margin n b c)
     (ordMin : UInt64) (t : Int) :
     ∀ (fuel : Nat) (h : Hint) (me opp : UInt64) (b : Board) (c : Color),
       Repr n me opp b c →
-      (BB.secMe ms mask ordMin t fuel h me opp = true → Secures n c t b c) ∧
-      (BB.secOp ms mask ordMin t fuel h me opp = true →
+      (BB.secMe fast ms mask ordMin t fuel h me opp = true → Secures n c t b c) ∧
+      (BB.secOp fast ms mask ordMin t fuel h me opp = true →
         Secures n c.opponent t b c) := by
   subst hms
+  have hfinal : ∀ (me opp : UInt64) (b : Board) (c : Color), Repr n me opp b c →
+      BB.finalMargin fast (sqMasks n) me opp = margin n b c := by
+    intro me opp b c hr
+    unfold BB.finalMargin
+    split
+    · rename_i hf
+      exact hfast hf me opp b c hr
+    · exact hr.margin_eq hn
   intro fuel
   induction fuel with
   | zero =>
@@ -312,8 +388,8 @@ theorem sec_sound (hn : n ≤ 6) {ms : List UInt64} (hms : ms = sqMasks n)
       · rename_i hz
         split at hs
         · rename_i hz'
-          have hle : t ≤ BB.margin (sqMasks n) me opp := of_decide_eq_true hs
-          rw [hr.margin_eq hn] at hle
+          have hle : t ≤ BB.finalMargin fast (sqMasks n) me opp := of_decide_eq_true hs
+          rw [hfinal me opp b c hr] at hle
           exact .over (hmv.1 hz) (hmv'.1 hz') hle
         · rename_i hz'
           have h1 := (ih h opp me b c.opponent hr.swap).2 hs
@@ -333,19 +409,27 @@ theorem sec_sound (hn : n ≤ 6) {ms : List UInt64} (hms : ms = sqMasks n)
       · rename_i hz
         split at hs
         · rename_i hz'
-          have hle : t ≤ BB.margin (sqMasks n) opp me := of_decide_eq_true hs
-          rw [hr.swap.margin_eq hn] at hle
+          have hle : t ≤ BB.finalMargin fast (sqMasks n) opp me := of_decide_eq_true hs
+          rw [hfinal opp me b c.opponent hr.swap] at hle
           exact .over (hmv.1 hz) (hmv'.1 hz') hle
         · rename_i hz'
           have h1 := (ih h opp me b c.opponent hr.swap).1 hs
           exact .pass (hmv.1 hz) (fun h0 => hz' (hmv'.2 h0)) h1
       · rename_i hnz
+        have hall : ∀ j, Mem (BB.mobility mask me opp) j →
+            ∃ (i : UInt64) (h' : Hint), j = bitNo i ∧
+              BB.secMe fast (sqMasks n) mask ordMin t fuel h'
+                (opp ^^^ BB.flips me opp ((1 : UInt64) <<< i))
+                (me ||| (1 : UInt64) <<< i ||| BB.flips me opp ((1 : UInt64) <<< i)) = true := by
+          split at hs
+          · exact allCandPar_sound _ _ _ hs
+          · exact allCand_sound _ _ hs
         refine .reply (Color.ne_opponent c) (fun h0 => hnz (hmv.2 h0)) ?_
         intro s hsm
         have hlegal := mem_moves.1 hsm
         have hi : Mem (BB.mobility mask me opp) (idx s) :=
           (mem_mobility_spec hn hmask hr _).2 ⟨s, hlegal, rfl⟩
-        obtain ⟨i, h', hidx, hk⟩ := allCand_sound _ _ hs _ hi
+        obtain ⟨i, h', hidx, hk⟩ := hall _ hi
         have hm : ∀ j, Mem ((1 : UInt64) <<< i) j ↔ j = idx s := by
           intro j; rw [mem_bit, hidx]
         have hr' := hr.play hn hlegal.1 hlegal.2.1 hm

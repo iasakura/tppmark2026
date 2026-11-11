@@ -38,24 +38,26 @@ theorem repr_initial4 : Repr 4 black4 white4 (initial 2) .black :=
   repr_of_check (by decide) (by decide +kernel)
 
 /-- The search (run by the kernel) finds a strategy for White that wins by 8. -/
-theorem search_white4 : BB.secOp masks4 mask4 4 8 60 Hint.none black4 white4 = true := by
+theorem search_white4 :
+    BB.secOp false masks4 mask4 4 8 60 Hint.none black4 white4 = true := by
   set_option maxHeartbeats 0 in
   decide +kernel
 
 /-- The search (run by the kernel) finds a strategy for Black that loses by
 no more than 8. -/
-theorem search_black4 : BB.secMe masks4 mask4 4 (-8) 60 Hint.none black4 white4 = true := by
+theorem search_black4 :
+    BB.secMe false masks4 mask4 4 (-8) 60 Hint.none black4 white4 = true := by
   set_option maxHeartbeats 0 in
   decide +kernel
 
 /-- White can secure a win by 8 discs. -/
 theorem white_secures_4x4 : Secures 4 .white 8 (initial 2) .black :=
-  (sec_sound (n := 4) (by decide) masks4_eq mem_mask4 4 8 60 Hint.none
+  (sec_sound (n := 4) (by decide) masks4_eq mem_mask4 false nofun 4 8 60 Hint.none
     black4 white4 (initial 2) .black repr_initial4).2 search_white4
 
 /-- Black can secure a loss by no more than 8 discs. -/
 theorem black_secures_4x4 : Secures 4 .black (-8) (initial 2) .black :=
-  (sec_sound (n := 4) (by decide) masks4_eq mem_mask4 4 (-8) 60 Hint.none
+  (sec_sound (n := 4) (by decide) masks4_eq mem_mask4 false nofun 4 (-8) 60 Hint.none
     black4 white4 (initial 2) .black repr_initial4).1 search_black4
 
 /-- **Problem 1.**  In 4 × 4 Othello, White (the second player) wins under
